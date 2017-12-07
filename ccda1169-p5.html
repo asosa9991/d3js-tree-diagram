@@ -1,0 +1,315 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+
+    <script type="text/javascript" src="//d3js.org/d3.v3.js"></script>
+    <style type="text/css">
+        .node {
+            cursor: pointer;
+        }
+        .node circle {
+            fill: #fff;
+            stroke: steelblue;
+            stroke-width: 1.5px;
+        }
+        .node text {
+            font: 11px Georgia;
+        }
+        .link {
+            fill: none;
+            stroke: #ccc;
+            stroke-width: 1.5px;
+        }
+
+        body {
+            overflow: hidden;
+        }
+    </style>
+
+       <script type='text/javascript'>
+    window.onload=function(){
+      var margin = {
+            top: 20,
+            right: 120,
+            bottom: 20,
+            left: 120
+          },
+          width = 1000 - margin.right - margin.left,
+          height = 800 - margin.top - margin.bottom;
+
+      var i = 0,
+          duration = 1050,
+          rectW = 100,
+          rectH = 45;
+
+      var tree = d3.layout.tree().nodeSize([120, 40]);
+// used to determine the link coordinates to draw the diagonal path between the nodes
+      var diagonal = d3.svg.diagonal()
+          .projection(function (d) {
+            return [d.y, d.x+rectH/2];
+          });
+
+      var svg = d3.select("#body").append("svg").attr("width", '100%')
+          .attr("height", '100%')
+          .call(zm = d3.behavior.zoom().scaleExtent([1,3]).on("zoom", redraw)).append("g")
+          .attr("transform", "translate(" +150 + "," + 300 + ")");
+
+// for the arrowhead
+      svg.append("defs").append("marker")
+          .attr("id", "arrowhead")// used to access the arrow
+          .attr("viewBox", "0 -5 10 10")
+          .attr("refX", 10) // arrow point x location
+          .attr("refY", 0)// arrow point y location
+          .attr("markerWidth", 10) // arrow width
+          .attr("markerHeight", 10) // arrow height
+          .attr("orient", "auto") // arrow direction
+          .append("svg:path")
+          .attr('d', 'M 0,-5 L 10 ,0 L 0,5') // draws the arrow
+          .attr('fill', '#999')
+          .style('stroke','none');
+
+
+
+//necessary so that zoom knows where to zoom and unzoom from
+      zm.translate([150, 300]);
+
+// graph needs the data to be in tree structure with parent and childern fields defined for all the nodes.
+// We assume that a root node does not have any parents.
+     d3.json('./treeView2.json', (err,treeData) => {
+
+       if(err) {
+         throw err;
+       }
+
+      var root = treeData[0];
+
+      root.y0 = 0;
+      root.x0 = 180;
+
+      function collapse(d) {
+        if (d.children) {
+          d._children = d.children;
+          d._children.forEach(collapse);
+          d.children = null;
+        }
+      }
+
+      // all the children are minimized at the launch
+      root.children.forEach(collapse);
+
+      update(root);
+
+      d3.select("#body").style("height", "800px");
+
+      function update(source) {
+
+        // Compute the new tree layout.
+        var nodes = tree.nodes(root).reverse(),
+            links = tree.links(nodes);
+
+
+        // Normalize for fixed-depth.
+// horizontal distance between links/nodes.
+        nodes.forEach(function (d) {
+          d.y = d.depth * 280;
+        });
+
+        // Update the nodes…
+        var node = svg.selectAll("g.node")
+            .data(nodes, function (d) {
+              return d.id || (d.id = ++i);
+            });
+
+        // Enter any new nodes at the parent's previous position.
+        var nodeEnter = node.enter().append("g")
+            .attr("class", "node")
+            .attr("transform", function (d) {
+              return "translate(" + source.y0 + "," + source.x0 + ")";
+            })
+            .on("click", click);
+
+        nodeEnter.append("rect")
+            .attr("rx",10)
+            .attr("ry",10)
+            .attr("width", rectW)
+            .attr("height", rectH)
+            .attr("stroke", "black")
+            .attr("stroke-width", 2)
+            .style("fill", function (d) {
+              return d._children ? "lightsteelblue" : "#fff";
+            })
+            .style("stroke-dasharray", function (d) {
+          return d._children ? "10 5" : "";
+        });
+
+        nodeEnter.append("text")
+            .attr("y", 12)
+            .text(function (d) {
+              return d.name;
+            })
+            .call(wrap, function(d) {
+              return this.previousElementSibling.getBBox().width;
+            });
+
+        nodeEnter.select("rect")
+            .attr("height", function(d) {
+              return this.getAttribute("height") > this.nextElementSibling.getBBox().height ? this.getAttribute("height") : this.nextElementSibling.getBBox().height +10;
+            });
+
+        // Transition nodes to their new position.
+        var nodeUpdate = node.transition()
+            .duration(duration)
+            .attr("transform", function (d) {
+              return "translate(" + d.y + "," + d.x + ")";
+            });
+
+        nodeUpdate.select("rect")
+            .attr("width", rectW)
+            .attr("height", function(d) {
+             return this.getAttribute("height") > this.nextElementSibling.getBBox().height ? this.getAttribute("height") : this.nextElementSibling.getBBox().height +10;
+            })
+            .attr("rx",10)
+            .attr("ry",10)
+            .attr("stroke", "black")
+            .attr("stroke-width", 2)
+            .style("fill", function (d) {
+              return d._children ? "lightsteelblue" : "#fff";
+            })
+            .style("stroke-dasharray", function (d) {
+              return d._children ? "10 5" : "";
+            });
+
+        nodeUpdate.select("text")
+            .style("fill-opacity", 1);
+
+        // Transition exiting nodes to the parent's new position.
+        var nodeExit = node.exit().transition()
+            .duration(duration)
+            .attr("transform", function (d) {
+              return "translate(" + source.y + "," + source.x + ")";
+            })
+            .remove();
+
+        nodeExit.select("rect")
+            .attr("width", rectW)
+            .attr("height", function(d) {
+              return this.getAttribute("height") > this.nextElementSibling.getBBox().height ? this.getAttribute("height") : this.nextElementSibling.getBBox().height +10;
+            })
+            .attr("stroke", "black")
+            .attr("stroke-width", 1);
+
+        nodeExit.select("text");
+
+        // Update the links…
+        var link = svg.selectAll("path.link")
+            .data(links, function (d) {
+              return d.target.id;
+            });
+
+        // Enter any new links at the parent's previous position.
+        link.enter().insert("path", "g")
+            .attr("class", "link")
+            .attr("x", rectW)
+            .attr("y", rectH / 2)
+            .attr("d", function (d) {
+              var o = {
+                x: source.x0,
+                y: source.y0
+              };
+              return diagonal({
+                source: o,
+                target: o
+              });
+            })
+            .attr('marker-end','url(#arrowhead)');
+
+        // Transition links to their new position.
+        link.transition()
+            .duration(duration)
+            .attr("d", diagonal);
+
+        // Transition exiting nodes to the parent's new position.
+        link.exit().transition()
+            .duration(duration)
+            .attr("d", function (d) {
+              var o = {
+                x: source.x,
+                y: source.y
+              };
+              return diagonal({
+                source: o,
+                target: o
+              });
+            })
+            .remove();
+
+        // Stash the old positions for transition.
+        nodes.forEach(function (d) {
+          d.x0 = d.x;
+          d.y0 = d.y;
+        });
+      }
+
+// Toggle children on click.
+      function click(d) {
+        if (d.children) {
+          d._children = d.children;
+          d.children = null;
+        } else {
+          d.children = d._children;
+          d._children = null;
+        }
+        update(d);
+      }
+    });
+
+// To warp text inside a rectangle based on the rectangle width.
+// If the wrapping text overflows, we expand the rectangle height dynamically
+      function wrap(text, width) {
+        var padding =5;
+        text.each(function() {
+          var text = d3.select(this),
+              words = text.text().split(/\s+/).reverse(),
+              word,
+              line = [],
+              lineNumber = 0,
+              lineHeight = 1.1, // ems
+              y = text.attr("y"),
+              dy = parseFloat(text.attr("dy")) || 0,
+              tspan = text.text(null).append("tspan").attr("x", padding).attr("y", y).attr("dy", dy + "em");
+
+          width = (typeof width === "function") ? width.call(this) : width;
+
+          while (word = words.pop()) {
+            line.push(word);
+            tspan.text(line.join(" "));
+            if (tspan.node().getComputedTextLength() + padding > width-padding) {
+              line.pop();
+              tspan.text(line.join(" "));
+              line = [word];
+              tspan = text.append("tspan").attr("x", padding).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+            }
+          }
+        });
+      }
+
+
+//Redraw for zoom
+      function redraw() {
+        svg.attr("transform",
+            "translate(" + d3.event.translate + ")"
+            + " scale(" + d3.event.scale + ")");
+      }
+    }
+
+    </script>
+
+
+</head>
+
+<body>
+<div id="body"></div>
+</body>
+</html>
+

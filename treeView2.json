@@ -1,0 +1,21 @@
+[
+  {
+    "name": "Top Level",
+    "children": [
+      {
+        "name": "Level 2: A. This is a child of Top Level",
+        "children": [
+          {
+            "name": "Son of A. I am the best son."
+          },
+          {
+            "name": "Daughter of A. I am the best daughter."
+          }
+        ]
+      },
+      {
+        "name": "Level 2: B. This is another child of Top Level "
+      }
+    ]
+  }
+]
